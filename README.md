@@ -1,0 +1,118 @@
+# Image Search Backend
+
+Express.js backend for Image Search & Multi-Select application with OAuth authentication and Unsplash API integration.
+
+## Setup
+
+1. Install dependencies:
+   \`\`\`bash
+   npm install
+   \`\`\`
+
+2. Create `.env` file from `.env.example` and add your credentials
+
+3. Start development server:
+   \`\`\`bash
+   npm run dev
+   \`\`\`
+
+## Environment Variables
+
+- `MONGODB_URI` - MongoDB connection string
+- `GOOGLE_CLIENT_ID` - Google OAuth Client ID
+- `GOOGLE_CLIENT_SECRET` - Google OAuth Client Secret
+- `UNSPLASH_ACCESS_KEY` - Unsplash API Access Key
+- `SESSION_SECRET` - Session encryption secret
+- `FRONTEND_URL` - Frontend URL for CORS and redirects
+- `BACKEND_URL` - Backend URL for OAuth callbacks
+- `PORT` - Server port (default: 5000)
+
+## API Documentation
+
+=== IMAGE SEARCH & MULTI-SELECT API DOCUMENTATION ===
+
+BASE_URL: http://localhost:5000
+
+=== AUTHENTICATION ROUTES ===
+
+GET /auth/google
+  - Description: Initiates Google OAuth flow
+  - Auth: No
+  - Response: Redirects to Google login
+
+GET /auth/google/callback
+  - Description: Google OAuth callback
+  - Auth: No
+  - Response: Redirects to FRONTEND_URL/auth/success on success
+
+POST /auth/logout
+  - Description: Logout user and destroy session
+  - Auth: Yes (cookie session)
+  - Response: { message: "Logged out successfully" }
+
+=== API ROUTES (All require authentication) ===
+
+GET /api/me
+  - Description: Get current logged-in user info
+  - Auth: Yes
+  - Response: { _id, provider, providerId, name, email, profilePhoto, createdAt }
+  - Error: 401 if not authenticated
+
+POST /api/search
+  - Description: Search images on Unsplash and save search to history
+  - Auth: Yes
+  - Rate Limit: 30 requests per 15 minutes
+  - Body: { term: string, page?: number, perPage?: number }
+  - Response: { term, total, totalPages, results: [ { id, alt, urls: { thumb, small, regular }, author: { name, username }, likes, links: { html, download } } ] }
+  - Error: 400 if term is empty, 429 if rate limited, 500 on Unsplash error
+
+GET /api/history
+  - Description: Get user's search history (paginated)
+  - Auth: Yes
+  - Query Params: ?page=1&limit=20
+  - Response: { history: [ { _id, userId, term, timestamp } ], pagination: { page, limit, total, pages } }
+  - Error: 500 on database error
+
+GET /api/top-searches
+  - Description: Get top 5 most searched terms by user
+  - Auth: Yes
+  - Response: [ { _id: term, count: number, lastSearched: timestamp } ]
+  - Error: 500 on database error
+
+POST /api/save-selection
+  - Description: Save selected images to database
+  - Auth: Yes
+  - Body: { images: [ { id: string, url: string, description?: string } ] }
+  - Response: { message: "Images saved", count: number }
+  - Error: 400 if images array is empty, 500 on database error
+
+GET /api/selected-images
+  - Description: Get all saved selected images for user
+  - Auth: Yes
+  - Response: [ { _id, userId, imageId, imageUrl, description, createdAt } ]
+  - Error: 500 on database error
+
+DELETE /api/selected-images/:imageId
+  - Description: Remove image from saved selections
+  - Auth: Yes
+  - Params: imageId (Unsplash image ID)
+  - Response: { message: "Image removed from selection" }
+  - Error: 500 on database error
+
+=== IMPORTANT NOTES ===
+
+1. All requests must include credentials: 'include' (for cookies)
+2. Session cookie is httpOnly and secure (in production)
+3. CORS is configured to allow FRONTEND_URL only
+4. Search results are cached for 1 minute to reduce API quota usage
+5. Rate limiting applies per IP address for /api/search endpoint
+6. All timestamps are in ISO 8601 format
+
+## Features
+
+- Google OAuth authentication
+- Image search via Unsplash API
+- Search history tracking
+- Top searches aggregation
+- Multi-select image saving
+- Rate limiting and caching
